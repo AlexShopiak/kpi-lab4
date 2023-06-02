@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/AlexShopiak/kpi-lab4/httptools"
@@ -26,8 +27,9 @@ var (
 	serversPool = []*Server{
     {url: "server1:8080"},
     {url: "server2:8080"},
-    {url: "server3:8080"},
-}
+  	{url: "server3:8080"},
+	}
+	mutex sync.Mutex
 )
 
 type Server struct {
@@ -98,7 +100,10 @@ func main() {
 		server := server
 		go func() {
 			for range time.Tick(10 * time.Second) {
-				log.Println(server, health(server))
+				mutex.Lock()
+				server.healthy = health(server)
+				log.Println(server.url,  server.connCnt, server.healthy)
+				mutex.Unlock()
 			}
 		}()
 	}
