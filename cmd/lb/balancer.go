@@ -69,6 +69,7 @@ func forward(server *Server, rw http.ResponseWriter, r *http.Request) error {
 
 	resp, err := http.DefaultClient.Do(fwdRequest)
 	if err == nil {
+		server.connCnt++
 		for k, values := range resp.Header {
 			for _, value := range values {
 				rw.Header().Add(k, value)
@@ -92,6 +93,30 @@ func forward(server *Server, rw http.ResponseWriter, r *http.Request) error {
 	}
 }
 
+func min(pool []*Server) int {
+	index := -1
+	minConn := -1
+		for _, server := range serversPool {
+			if server.healthy {
+					minConn = server.connCnt
+			}
+			
+		}
+		if minConn == -1 {
+			return minConn
+		}
+	
+		for i, server := range serversPool {
+			if server.healthy {
+				if  server.connCnt < minConn  {
+					index = i
+					minConn = server.connCnt
+				}
+			}    
+		}
+		return index
+	}
+
 func main() {
 	flag.Parse()
 
@@ -109,8 +134,8 @@ func main() {
 	}
 
 	frontend := httptools.CreateServer(*port, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		// TODO: Рееалізуйте свій алгоритм балансувальника.
-		forward(serversPool[0], rw, r)
+		index := min(serversPool)
+		forward(serversPool[index], rw, r)
 	}))
 
 	log.Println("Starting load balancer...")
