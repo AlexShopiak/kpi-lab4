@@ -25,9 +25,9 @@ var (
 var (
 	timeout     = time.Duration(*timeoutSec) * time.Second
 	serversPool = []*Server{
-    {url: "server1:8080"},
-    {url: "server2:8080"},
-  	{url: "server3:8080"},
+		{url: "server1:8080"},
+		{url: "server2:8080"},
+		{url: "server3:8080"},
 	}
 	mutex sync.Mutex
 )
@@ -59,7 +59,12 @@ func health(server *Server) bool {
 	return true
 }
 
-func forward(server *Server, rw http.ResponseWriter, r *http.Request) error {
+func forward(pool []*Server, index int, rw http.ResponseWriter, r *http.Request) error {
+	if index == -1 {
+		rw.WriteHeader(http.StatusServiceUnavailable)
+		return fmt.Errorf("All servers are dead. No more healthy servers")
+	}
+	server := pool[index]
 	ctx, _ := context.WithTimeout(r.Context(), timeout)
 	fwdRequest := r.Clone(ctx)
 	fwdRequest.RequestURI = ""
@@ -93,29 +98,32 @@ func forward(server *Server, rw http.ResponseWriter, r *http.Request) error {
 	}
 }
 
+//Finds 1st healthy server
+//Returns -1 if didnt find
+//Finds server with less connections
 func min(pool []*Server) int {
 	index := -1
 	minConn := -1
-		for _, server := range serversPool {
-			if server.healthy {
-					minConn = server.connCnt
-			}
-			
+
+	for i, server := range serversPool {
+		if server.healthy {
+			index = i
+			minConn = server.connCnt
 		}
-		if minConn == -1 {
-			return minConn
-		}
-	
-		for i, server := range serversPool {
-			if server.healthy {
-				if  server.connCnt < minConn  {
-					index = i
-					minConn = server.connCnt
-				}
-			}    
-		}
+		
+	}
+	if index == -1 {
 		return index
 	}
+	
+	for i, server := range serversPool {
+		if  server.healthy && server.connCnt < minConn  {
+			index = i
+			minConn = server.connCnt
+		}   
+	}
+	return index
+}
 
 func main() {
 	flag.Parse()
@@ -134,8 +142,10 @@ func main() {
 	}
 
 	frontend := httptools.CreateServer(*port, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		mutex.Lock()
 		index := min(serversPool)
-		forward(serversPool[index], rw, r)
+		forward(serversPool, index, rw, r)
+		mutex.Unlock()
 	}))
 
 	log.Println("Starting load balancer...")
