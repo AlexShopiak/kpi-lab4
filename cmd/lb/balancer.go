@@ -30,6 +30,12 @@ var (
 	}
 )
 
+type Server struct {
+	healthy  bool
+	connCnt int
+	url string
+}
+
 func scheme() string {
 	if *https {
 		return "https"
