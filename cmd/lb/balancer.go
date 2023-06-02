@@ -23,11 +23,11 @@ var (
 
 var (
 	timeout     = time.Duration(*timeoutSec) * time.Second
-	serversPool = []string{
-		"server1:8080",
-		"server2:8080",
-		"server3:8080",
-	}
+	serversPool = []*Server{
+    {url: "server1:8080"},
+    {url: "server2:8080"},
+    {url: "server3:8080"},
+}
 )
 
 type Server struct {
@@ -43,10 +43,10 @@ func scheme() string {
 	return "http"
 }
 
-func health(dst string) bool {
+func health(server *Server) bool {
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	req, _ := http.NewRequestWithContext(ctx, "GET",
-		fmt.Sprintf("%s://%s/health", scheme(), dst), nil)
+		fmt.Sprintf("%s://%s/health", scheme(), server.url), nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return false
@@ -57,13 +57,13 @@ func health(dst string) bool {
 	return true
 }
 
-func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
+func forward(server *Server, rw http.ResponseWriter, r *http.Request) error {
 	ctx, _ := context.WithTimeout(r.Context(), timeout)
 	fwdRequest := r.Clone(ctx)
 	fwdRequest.RequestURI = ""
-	fwdRequest.URL.Host = dst
+	fwdRequest.URL.Host = server.url
 	fwdRequest.URL.Scheme = scheme()
-	fwdRequest.Host = dst
+	fwdRequest.Host = server.url
 
 	resp, err := http.DefaultClient.Do(fwdRequest)
 	if err == nil {
@@ -73,7 +73,7 @@ func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
 			}
 		}
 		if *traceEnabled {
-			rw.Header().Set("lb-from", dst)
+			rw.Header().Set("lb-from", server.url)
 		}
 		log.Println("fwd", resp.StatusCode, resp.Request.URL)
 		rw.WriteHeader(resp.StatusCode)
@@ -84,7 +84,7 @@ func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
 		}
 		return nil
 	} else {
-		log.Printf("Failed to get response from %s: %s", dst, err)
+		log.Printf("Failed to get response from %s: %s", server.url, err)
 		rw.WriteHeader(http.StatusServiceUnavailable)
 		return err
 	}
