@@ -105,18 +105,18 @@ func min(pool []*Server) int {
 	index := -1
 	minConn := -1
 
-	for i, server := range serversPool {
+	for i, server := range pool {
 		if server.healthy {
 			index = i
 			minConn = server.connCnt
-		}
-		
+			break
+		}		
 	}
 	if index == -1 {
 		return index
 	}
 	
-	for i, server := range serversPool {
+	for i, server := range pool {
 		if  server.healthy && server.connCnt < minConn  {
 			index = i
 			minConn = server.connCnt
