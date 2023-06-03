@@ -5,6 +5,8 @@ import (
 
 	"github.com/jarcoal/httpmock"
 	. "gopkg.in/check.v1"
+	"net/http"
+	"net/http/httptest"
 )
 
 type MySuite struct{}
@@ -71,4 +73,29 @@ func (s *MySuite) TestScheme(c *C) {
 
 	*https = false
 	c.Assert(scheme(), Equals, "http")
+}
+
+func (s *MySuite) TestForward(c *C) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	// Exact URL match
+	httpmock.RegisterResponder("GET", "http://server1:8080/data",
+		httpmock.NewStringResponder(200, "OK"))
+	pool := []*Server{{url: "server1:8080", healthy: true}}
+	rr := httptest.NewRecorder()
+
+	// do stuff that makes a request to articles
+	req, err := http.NewRequest("GET", "/data", nil)
+	c.Assert(err, Equals, nil)
+
+	err = forward(pool, 0, rr, req)
+	c.Assert(err, Equals, nil)
+
+	err = forward(pool, -1, rr, req)
+	c.Assert(err, ErrorMatches, "All servers are dead. No more healthy servers")
+
+	pool[0].url = "server2:8080"
+	err = forward(pool, 0, rr, req)
+	c.Assert(err, ErrorMatches, "Get \"http://server2:8080/data\": no responder found")
 }
