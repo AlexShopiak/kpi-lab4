@@ -144,8 +144,8 @@ func main() {
 	frontend := httptools.CreateServer(*port, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		mutex.Lock()
 		index := min(serversPool)
-		forward(serversPool, index, rw, r)
 		mutex.Unlock()
+		forward(serversPool, index, rw, r)
 	}))
 
 	log.Println("Starting load balancer...")
