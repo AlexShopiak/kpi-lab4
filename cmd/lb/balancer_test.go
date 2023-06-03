@@ -64,3 +64,11 @@ func (s *MySuite) TestHealth(c *C) {
 
 	c.Assert(healthy, Equals, true)
 }
+
+func (s *MySuite) TestScheme(c *C) {
+	*https = true
+	c.Assert(scheme(), Equals, "https")
+
+	*https = false
+	c.Assert(scheme(), Equals, "http")
+}
